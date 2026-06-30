@@ -1,0 +1,22 @@
+# ===== Secretos — NUNCA subir =====
+.env
+*.env
+!.env.example
+
+# ===== Entorno y datos =====
+.venv/
+venv/
+data/
+*.log
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# ===== Sistema =====
+.DS_Store
+Thumbs.db
+*.tmp

@@ -6,7 +6,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Bod
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config, store, jobs, media
+from . import config, store, jobs, media, captions
 
 app = FastAPI(title="TikTokAI")
 
@@ -95,6 +95,10 @@ def get_project(pid: str):
     proj = store.load_project(pid)
     if not proj:
         raise HTTPException(status_code=404, detail="No existe")
+    # Añadir el % de render en curso (memoria, sin tocar disco)
+    prog = jobs.RENDER_PROGRESS.get(pid)
+    if prog is not None:
+        proj.setdefault("steps", {}).setdefault("render", {})["progress"] = prog
     return _public(proj)
 
 
@@ -138,6 +142,69 @@ def update_transcript(pid: str, payload: dict = Body(...)):
             })
         tr["words"] = clean
     store.update_project(pid, transcript=tr)
+    return {"ok": True}
+
+
+@app.get("/api/sfx")
+def list_sfx():
+    """Lista dinámica de efectos de sonido: cualquier .mp3 en la carpeta sfx/."""
+    return {"sfx": sorted(f.stem for f in config.SFX_DIR.glob("*.mp3"))}
+
+
+@app.post("/api/projects/{pid}/hook")
+def gen_hook(pid: str):
+    """Genera un hook viral corto con IA a partir de la transcripción."""
+    proj = store.load_project(pid)
+    if not proj:
+        raise HTTPException(status_code=404, detail="No existe")
+    text = (proj.get("transcript") or {}).get("raw_text", "")
+    if not text:
+        words = (proj.get("transcript") or {}).get("words", [])
+        text = " ".join(w.get("word", "") for w in words)
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Transcribe primero")
+    try:
+        hook = captions.generate_hook(text)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"IA no disponible: {e}")
+    if not hook:
+        raise HTTPException(status_code=502, detail="La IA no devolvió hook")
+    return {"hook": hook}
+
+
+@app.put("/api/projects/{pid}/elements")
+def update_elements(pid: str, payload: dict = Body(...)):
+    """Guarda los elementos con tiempo de la línea de tiempo: títulos y sonidos."""
+    proj = store.load_project(pid)
+    if not proj:
+        raise HTTPException(status_code=404, detail="No existe")
+    changes = {}
+    if "titles" in payload:
+        clean = []
+        for t in (payload.get("titles") or [])[:20]:
+            start = max(0.0, float(t.get("start", 0) or 0))
+            end = float(t.get("end", start + 2.5) or (start + 2.5))
+            clean.append({
+                "id": str(t.get("id") or "")[:16] or "t",
+                "text": str(t.get("text") or "")[:120],
+                "start": round(start, 3),
+                "end": round(max(start + 0.2, end), 3),
+                "color": str(t.get("color") or "#FFFFFF")[:9],
+                "size": max(40, min(200, int(t.get("size") or 120))),
+                "pos": max(5.0, min(95.0, float(t.get("pos") or 24))),
+                "sound": str(t.get("sound") or "")[:24],
+            })
+        changes["titles"] = clean
+    if "sounds" in payload:
+        clean = []
+        for s in (payload.get("sounds") or [])[:40]:
+            clean.append({
+                "id": str(s.get("id") or "")[:16] or "s",
+                "sfx": str(s.get("sfx") or "whoosh")[:24],
+                "t": round(max(0.0, float(s.get("t", 0) or 0)), 3),
+            })
+        changes["sounds"] = clean
+    store.update_project(pid, **changes)
     return {"ok": True}
 
 
@@ -205,8 +272,16 @@ def _public(proj: dict) -> dict:
 
 # ---------- Frontend ----------
 app.mount("/static", StaticFiles(directory=str(config.STATIC_DIR)), name="static")
+# Fuentes locales (las mismas que usa el render) para que el preview coincida
+app.mount("/fonts", StaticFiles(directory=str(config.FONTS_DIR)), name="fonts")
+# Efectos de sonido (para previsualizar en el navegador y mezclar en el render)
+app.mount("/sfx", StaticFiles(directory=str(config.SFX_DIR)), name="sfx")
 
 
 @app.get("/")
 def index():
-    return FileResponse(str(config.STATIC_DIR / "index.html"))
+    # Sin caché para que el HTML (y las versiones de JS/CSS) siempre lleguen frescos
+    return FileResponse(
+        str(config.STATIC_DIR / "index.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )

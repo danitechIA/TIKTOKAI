@@ -44,10 +44,10 @@ PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_STYLE = {
     "font": "Montserrat Black",
     "font_size": 92,            # tamaño a resolución 1080 de ancho
-    "primary_color": "#FFFFFF", # color del texto normal
-    "highlight_color": "#22E584", # color de la palabra activa
+    "primary_color": "#FFFFFF", # color del texto normal (blanco puro)
+    "highlight_color": "#FE2C55", # color de la palabra activa
     "outline_color": "#000000", # borde
-    "outline_width": 7,
+    "outline_width": 8,
     "shadow": 4,
     "position_v": 62,           # % vertical (0 arriba, 100 abajo)
     "margin_h": 90,             # margen horizontal en px
@@ -57,4 +57,14 @@ DEFAULT_STYLE = {
     "active_scale": 116,        # % de "pop" de la palabra activa
     "active_color_mode": "color", # color | box
     "time_offset": 0.0,         # desfase global en segundos (+/-)
+    # Gancho / título inicial (los primeros segundos, para retención)
+    "hook_enabled": False,
+    "hook_text": "",
+    "hook_seconds": 2.5,        # duración del título
+    "hook_position": 24,        # % vertical (arriba)
+    "hook_size": 120,           # tamaño (a resolución 1080 de ancho)
+    "hook_color": "#FFFFFF",
+    "hook_sound": "",           # efecto de sonido del gancho ("" = ninguno)
 }
+
+SFX_DIR = BASE_DIR / "sfx"

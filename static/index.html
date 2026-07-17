@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TikTokAI · Orquestador de subtítulos</title>
+  <title>TikTokAI · Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=15">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 </head>
 <body>
 
@@ -15,13 +18,11 @@
   <div id="login" class="login-wrap hidden">
     <div class="panel login-card">
       <div class="logo-big">🎬</div>
-      <h1 style="font-size:22px; margin-bottom:6px;">TikTokAI</h1>
-      <p class="hint-text" style="margin-bottom:20px;">Orquestador de edición y subtítulos</p>
-      <div class="field">
-        <input type="password" id="login-pass" placeholder="Contraseña de acceso" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
+      <h1 style="font-family:'Space Grotesk';font-size:24px;margin-bottom:6px;">TikTok<span class="grad-text">AI</span></h1>
+      <p class="hint-text" style="margin-bottom:22px;">Studio de edición y subtítulos</p>
+      <div class="field"><input type="password" id="login-pass" placeholder="Contraseña de acceso" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <button class="btn btn-primary btn-block" onclick="doLogin()">Entrar</button>
-      <p id="login-err" class="hint-text" style="color:var(--err); margin-top:12px;"></p>
+      <p id="login-err" class="hint-text" style="color:var(--err);margin-top:12px;"></p>
     </div>
   </div>
 
@@ -30,130 +31,108 @@
     <div class="topbar">
       <div class="brand">
         <div class="logo">🎬</div>
-        TikTokAI
-        <span class="tag">dev · ai</span>
+        <div class="title">TikTok<span class="grad-text">AI</span></div>
+        <span class="tag">studio</span>
       </div>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <span class="hint-text" id="vps-note">Groq Whisper · render local</span>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" id="theme-btn" onclick="toggleTheme()" title="Tema"><i data-lucide="moon" class="ic"></i></button>
         <button class="btn btn-ghost btn-sm" onclick="logout()">Salir</button>
       </div>
     </div>
 
     <div class="layout">
-      <!-- IZQUIERDA: proyectos -->
-      <div>
+      <!-- IZQUIERDA -->
+      <div id="sidebar">
         <div class="panel">
-          <h2>Nuevo vídeo</h2>
+          <div class="panel-title"><i data-lucide="upload-cloud" class="ic"></i> Nuevo vídeo</div>
           <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
-            <div class="big">📲</div>
-            <div style="font-weight:600; margin-bottom:4px;">Sube tu vídeo (vertical iPhone)</div>
-            <div class="sub">Arrastra o haz clic · MP4, MOV…</div>
+            <div class="dz-icon">📲</div>
+            <div class="dz-main">Sube tu vídeo vertical</div>
+            <div class="dz-sub">Arrastra o haz clic · MP4, MOV…</div>
             <div class="progress-bar hidden" id="upload-progress"><div class="fill"></div></div>
           </div>
           <input type="file" id="file-input" accept="video/*" class="hidden" onchange="handleUpload(this.files[0])">
-
-          <h2 style="margin-top:8px;">Proyectos</h2>
+          <div class="panel-title" style="margin-top:6px;"><i data-lucide="folder" class="ic"></i> Proyectos</div>
           <div class="proj-list" id="proj-list"></div>
         </div>
       </div>
 
-      <!-- DERECHA: editor -->
-      <div>
+      <!-- DERECHA -->
+      <div id="main">
         <div id="no-project" class="panel">
           <div class="empty">
             <div class="big">🎬</div>
-            <div style="font-weight:700; font-size:18px; margin-bottom:8px;">Selecciona o sube un vídeo</div>
-            <div class="hint-text">El flujo: subir → transcribir → editar palabras y estilo → renderizar subtítulos → descargar.</div>
+            <div style="font-family:'Space Grotesk';font-weight:700;font-size:19px;margin-bottom:8px;">Sube un vídeo para empezar</div>
+            <div class="hint-text">Subir → transcribir → editar en la línea de tiempo → renderizar → descargar.</div>
           </div>
         </div>
 
         <div id="editor" class="hidden">
-          <div class="panel" style="margin-bottom:24px;">
-            <!-- Stepper -->
+          <div class="panel">
             <div class="stepper" id="stepper"></div>
 
-            <div class="editor">
-              <!-- Preview -->
-              <div>
+            <div class="editor-top">
+              <!-- PREVIEW -->
+              <div class="pv-col">
                 <div class="phone" id="phone">
-                  <video id="preview-video" controls playsinline></video>
-                  <div class="placeholder hidden" id="preview-ph"></div>
+                  <video id="preview-video" playsinline onclick="togglePlay()" style="cursor:pointer;"></video>
+                  <div class="sub-overlay" id="sub-overlay"></div>
+                  <div class="hook-overlay" id="title-overlay"></div>
                 </div>
-                <div style="text-align:center; margin-top:10px;">
-                  <button class="btn btn-ghost btn-sm" id="btn-toggle-preview" onclick="togglePreviewSource()">Ver original</button>
+                <div class="preview-controls">
+                  <button class="btn btn-ghost btn-sm" onclick="seekTo(0)" title="Ir al inicio"><i data-lucide="skip-back" class="ic"></i></button>
+                  <button class="btn btn-ghost btn-sm" id="btn-play" onclick="togglePlay()"><i data-lucide="play" class="ic"></i> Reproducir</button>
+                  <button class="btn btn-ghost btn-sm hidden" id="btn-source" onclick="toggleSource()">Ver render</button>
                 </div>
-                <div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">
-                  <button class="btn btn-primary btn-block" id="btn-render" onclick="doRender()">✨ Renderizar subtítulos</button>
+                <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px;">
+                  <button class="btn btn-primary btn-block" id="btn-render" onclick="doRender()"><i data-lucide="sparkles" class="ic"></i> Renderizar</button>
                   <div id="job-status" class="job-status hidden"></div>
-                  <button class="btn btn-accent btn-block hidden" id="btn-download" onclick="doDownload()">⬇ Descargar vídeo final</button>
-                  <button class="btn btn-danger btn-sm" onclick="doDelete()">Eliminar proyecto</button>
+                  <div id="download-group" class="hidden" style="display:flex;gap:8px;">
+                    <button class="btn btn-accent" style="flex:1" onclick="doDownload()"><i data-lucide="download" class="ic"></i> MP4</button>
+                    <button class="btn btn-accent" style="flex:1" onclick="doDownloadIphone()"><i data-lucide="smartphone" class="ic"></i> iPhone</button>
+                  </div>
+                  <button class="btn btn-danger btn-sm" onclick="doDelete()"><i data-lucide="trash-2" class="ic"></i> Eliminar proyecto</button>
                 </div>
               </div>
 
-              <!-- Controls -->
-              <div>
-                <!-- Paso 1: transcripción -->
-                <div class="section-title">1 · Transcripción</div>
-                <div id="transcribe-area">
-                  <div class="field">
-                    <div class="row">
-                      <select id="lang-select" style="max-width:160px;">
-                        <option value="es">Español</option>
-                        <option value="en">Inglés</option>
-                        <option value="auto">Auto-detectar</option>
-                      </select>
-                      <button class="btn btn-primary btn-sm" id="btn-transcribe" onclick="doTranscribe()">Transcribir con IA</button>
-                    </div>
-                  </div>
-                  <p class="hint-text" id="transcribe-hint">Genera los subtítulos con timestamps por palabra (Groq Whisper).</p>
+              <!-- INSPECTOR CONTEXTUAL -->
+              <div class="insp" id="inspector"></div>
+            </div>
+
+            <!-- LÍNEA DE TIEMPO MULTI-PISTA -->
+            <div id="timeline-section" class="tle hidden">
+              <div class="tle-head">
+                <span class="tle-lbl-title"><i data-lucide="clapperboard" class="ic"></i> Línea de tiempo</span>
+                <div class="tle-add">
+                  <button class="btn btn-ghost btn-sm" onclick="addTitleAtCursor()"><i data-lucide="type" class="ic"></i> Título</button>
+                  <button class="btn btn-ghost btn-sm" onclick="addSoundAtCursor()"><i data-lucide="volume-2" class="ic"></i> Sonido</button>
                 </div>
-
-                <!-- Editor de palabras -->
-                <div id="words-area" class="hidden">
-                  <div class="section-title" style="justify-content:space-between;">
-                    <span>2 · Palabras <span class="hint-text" style="font-weight:400;">(clic para editar)</span></span>
-                    <button class="btn btn-ghost btn-sm" onclick="saveWords()">Guardar texto</button>
-                  </div>
-                  <div class="words" id="words"></div>
-                  <p class="hint-text" style="margin-top:6px;">Clic en una palabra para corregir el texto · doble clic para desactivarla.</p>
-
-                  <!-- Sincronización -->
-                  <div class="section-title" style="justify-content:space-between;">
-                    <span>3 · Sincronización ⏱</span>
-                    <button class="btn btn-ghost btn-sm" id="btn-toggle-timing" onclick="toggleTiming()">Editar tiempos por palabra</button>
-                  </div>
-                  <div class="field">
-                    <label>Desfase global (segundos) — negativo adelanta los subtítulos</label>
-                    <div class="row">
-                      <button class="btn btn-ghost btn-sm" onclick="nudgeOffset(-0.05)">−0.05</button>
-                      <input type="range" min="-1.5" max="1.5" step="0.05" value="0" id="offset-range"
-                             oninput="onOffset(this.value)">
-                      <button class="btn btn-ghost btn-sm" onclick="nudgeOffset(0.05)">+0.05</button>
-                      <span class="val" id="offset-val">0.00</span>
-                    </div>
-                    <p class="hint-text">Si los subtítulos van por detrás de tu voz, baja el valor; si van por delante, súbelo. Re-renderiza para aplicarlo.</p>
-                  </div>
-
-                  <!-- Editor de tiempos por palabra -->
-                  <div id="timing-editor" class="hidden">
-                    <div class="timing-list" id="timing-list"></div>
-                    <p class="hint-text" style="margin-top:6px;">▶ salta el vídeo a ese momento para comprobar el sync · edita inicio/fin (segundos).</p>
-                    <button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="saveWords()">Guardar tiempos</button>
-                  </div>
-
-                  <!-- Estilo -->
-                  <div class="section-title">4 · Estilo de subtítulos</div>
-                  <div id="style-controls"></div>
+                <div class="tle-zoom">
+                  <span class="tle-time" id="tle-time">00:00 / 00:00</span>
+                  <button class="btn btn-ghost btn-sm" onclick="tlZoom(0.66)" title="Alejar"><i data-lucide="zoom-out" class="ic"></i></button>
+                  <button class="btn btn-ghost btn-sm" onclick="tlZoomFit()" title="Ajustar">Ajustar</button>
+                  <button class="btn btn-ghost btn-sm" onclick="tlZoom(1.5)" title="Acercar"><i data-lucide="zoom-in" class="ic"></i></button>
                 </div>
-
-                <!-- Copy -->
-                <div class="section-title">5 · Copy para TikTok <span id="cap-spin"></span></div>
-                <button class="btn btn-ghost btn-sm" onclick="doCaption()" id="btn-caption">Generar descripción + hashtags</button>
-                <div class="caption-box hidden" id="caption-box" style="margin-top:12px;">
-                  <div class="cap" id="cap-text"></div>
-                  <div class="hashtags" id="cap-tags"></div>
-                  <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="copyCaption()">Copiar todo</button>
+              </div>
+              <div class="tle-body">
+                <div class="tle-gutter">
+                  <div class="g"><i data-lucide="captions" class="ic"></i> Subtítulos</div>
+                  <div class="g"><i data-lucide="type" class="ic"></i> Título</div>
+                  <div class="g"><i data-lucide="volume-2" class="ic"></i> Sonido</div>
                 </div>
+                <div class="tle-scroll" id="tle-scroll"><div class="tle-inner" id="tle-inner"></div><div class="tle-tip hidden" id="tle-tip"></div></div>
+              </div>
+              <p class="hint-text" style="margin-top:8px;">Clic en un bloque para editarlo a la derecha · arrastra para moverlo, bordes para recortar · clic en zona vacía para colocar el cursor · <b>espacio</b> reproduce · <b>Ctrl+Z</b> deshace · <b>←/→</b> mueve el cursor.</p>
+            </div>
+
+            <!-- COPY -->
+            <div id="copy-section" class="hidden" style="margin-top:18px;">
+              <div class="section-title"><span class="lbl"><i data-lucide="hash" class="ic"></i> Copy para TikTok</span> <span id="cap-spin"></span></div>
+              <button class="btn btn-ghost btn-sm" onclick="doCaption()" id="btn-caption"><i data-lucide="sparkles" class="ic"></i> Generar descripción + hashtags</button>
+              <div class="caption-box hidden" id="caption-box" style="margin-top:12px;">
+                <div class="cap" id="cap-text"></div>
+                <div class="hashtags" id="cap-tags"></div>
+                <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="copyCaption()"><i data-lucide="copy" class="ic"></i> Copiar todo</button>
               </div>
             </div>
           </div>
@@ -163,6 +142,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=15" defer></script>
 </body>
 </html>

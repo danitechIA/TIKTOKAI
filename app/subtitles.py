@@ -77,7 +77,7 @@ def _group_words(words: list[dict], words_per_line: int, max_gap: float) -> list
     return chunks
 
 
-def build_ass(transcript: dict, style: dict, play_w: int, play_h: int) -> str:
+def build_ass(transcript: dict, style: dict, play_w: int, play_h: int, titles=None) -> str:
     """Construye el contenido del fichero .ass a partir de palabras y estilo."""
     st = {**config.DEFAULT_STYLE, **(style or {})}
 
@@ -123,35 +123,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     pos_tag = f"\\an5\\pos({pos_x},{pos_y})"
     max_width = play_w - 2 * margin_h
 
-    # Aplanar todas las palabras conservando a qué bloque pertenecen y su
-    # distribución en líneas. Así cada evento dura exactamente hasta la
-    # siguiente palabra (global) y NUNCA se solapan dos bloques en pantalla.
-    flat = []  # (word, chunk, wrapped)
-    for chunk in chunks:
-        wrapped = _wrap_chunk(chunk, font_size, max_width, upper)
-        for w in chunk:
-            flat.append((w, chunk, wrapped))
+    PAD = 0.3  # margen que el bloque permanece tras la última palabra
 
-    for idx, (w, chunk, wrapped) in enumerate(flat):
-        start = w["start"]
-        last_in_chunk = w is chunk[-1]
-        if idx + 1 < len(flat):
-            nxt_start = flat[idx + 1][0]["start"]
-            if last_in_chunk and (nxt_start - w["end"]) > max_gap:
-                # Hay silencio antes del próximo bloque: no mantener el texto
-                end = w["end"] + 0.35
-            else:
-                end = nxt_start
-        else:
-            end = w["end"] + 0.35
-        if end <= start:
-            end = start + 0.08
-
-        # Aplicar el desfase global y proteger límites
-        start = max(0.0, start + offset)
-        end = max(start + 0.05, end + offset)
-
-        # Renderizar todas las líneas del bloque, resaltando la palabra activa
+    def _render_chunk(wrapped, active):
+        """Devuelve el texto del bloque con la palabra 'active' resaltada (o ninguna)."""
         line_strs = []
         for line in wrapped:
             parts = []
@@ -159,19 +134,89 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 txt = _escape(ww["word"].strip())
                 if upper:
                     txt = txt.upper()
-                if ww is w:
-                    # Palabra activa: color de resaltado + "pop" de escala
+                if active is not None and ww is active:
                     parts.append(
                         f"{{\\c{highlight}\\fscx{active_scale}\\fscy{active_scale}}}{txt}{{\\r}}"
                     )
                 else:
                     parts.append(txt)
             line_strs.append(" ".join(parts))
-        text = "\\N".join(line_strs)
-        dialogue = (
-            f"Dialogue: 0,{_fmt_time(start)},{_fmt_time(end)},Base,,0,0,0,,"
-            f"{{{pos_tag}}}{text}"
+        return "\\N".join(line_strs)
+
+    for ci, chunk in enumerate(chunks):
+        wrapped = _wrap_chunk(chunk, font_size, max_width, upper)
+        cstart = chunk[0]["start"]
+        next_start = chunks[ci + 1][0]["start"] if ci + 1 < len(chunks) else float("inf")
+        # El bloque es visible desde su primera palabra hasta el fin de la última
+        # (+PAD), o hasta que empieza el siguiente bloque.
+        cend = min(chunk[-1]["end"] + PAD, next_start)
+        if cend <= cstart:
+            cend = cstart + 0.1
+
+        # Segmentos: límites en cada inicio/fin de palabra dentro de la ventana.
+        # En cada segmento se resalta la palabra cuyo [inicio, fin] lo contiene.
+        bset = {cstart, cend}
+        for w in chunk:
+            if cstart <= w["start"] <= cend:
+                bset.add(w["start"])
+            if cstart <= w["end"] <= cend:
+                bset.add(w["end"])
+        bounds = sorted(bset)
+
+        for a, b in zip(bounds, bounds[1:]):
+            if b - a < 0.03:
+                continue
+            mid = (a + b) / 2.0
+            active = None
+            for w in chunk:
+                if w["start"] <= mid < w["end"]:
+                    active = w
+                    break
+            text = _render_chunk(wrapped, active)
+            start = max(0.0, a + offset)
+            end = max(start + 0.05, b + offset)
+            lines.append(
+                f"Dialogue: 0,{_fmt_time(start)},{_fmt_time(end)},Base,,0,0,0,,"
+                f"{{{pos_tag}}}{text}"
+            )
+
+    # ----- Títulos (elementos con tiempo, entrada animada; en cualquier momento) -----
+    if titles is None:
+        # Compatibilidad: proyectos antiguos con el gancho en style.hook_*
+        titles = []
+        if st.get("hook_enabled") and (st.get("hook_text") or "").strip():
+            titles = [{
+                "text": st["hook_text"], "start": 0.0,
+                "end": float(st.get("hook_seconds") or 2.5),
+                "color": st.get("hook_color") or "#FFFFFF",
+                "size": int(st.get("hook_size") or 120),
+                "pos": float(st.get("hook_position") or 24),
+            }]
+
+    for t in titles:
+        ttxt = (t.get("text") or "").strip()
+        if not ttxt:
+            continue
+        ts = max(0.0, float(t.get("start", 0) or 0))
+        te = float(t.get("end", ts + 2.5) or (ts + 2.5))
+        if te <= ts:
+            te = ts + 0.5
+        tsize = int(t.get("size") or 120)
+        tcolor = _hex_to_ass(t.get("color") or "#FFFFFF")
+        ty = int(play_h * (float(t.get("pos") or 24) / 100.0))
+        if upper:
+            ttxt = ttxt.upper()
+        twords = [{"word": w, "start": 0, "end": 0} for w in ttxt.split()]
+        twrapped = _wrap_chunk(twords, tsize, max_width, upper=False)
+        ttext = "\\N".join(" ".join(_escape(ww["word"]) for ww in line) for line in twrapped)
+        # Las etiquetas \t/\fad usan tiempos RELATIVOS al evento → la animación
+        # de entrada funciona igual empiece el título donde empiece.
+        anim = (
+            f"\\an5\\pos({pos_x},{ty})\\fad(250,200)\\c{tcolor}\\fs{tsize}\\b1"
+            f"\\fscx70\\fscy70\\t(0,350,\\fscx110\\fscy110)\\t(350,520,\\fscx100\\fscy100)"
         )
-        lines.append(dialogue)
+        lines.append(
+            f"Dialogue: 1,{_fmt_time(ts)},{_fmt_time(te)},Base,,0,0,0,,{{{anim}}}{ttext}"
+        )
 
     return "\n".join(lines) + "\n"

@@ -20,6 +20,51 @@ SYSTEM = (
 )
 
 
+HOOK_SYSTEM = (
+    "Eres experto en ganchos (hooks) de TikTok en español para contenido de "
+    "desarrollo de apps e IA. Un buen hook genera curiosidad o promete valor "
+    "en 3-8 palabras, SIN inventar nada que no esté en el vídeo. "
+    "Nada de comillas ni emojis ni punto final. Ejemplos de estilo: "
+    "'Esto cambia cómo creas apps' / 'Nadie usa así la IA' / "
+    "'Crea tu app con IA'. Prohibido prometer resultados que el vídeo no muestra."
+)
+
+
+def generate_hook(transcript_text: str) -> str:
+    """Genera UN hook viral corto y fiel al contenido del vídeo."""
+    if not config.GROQ_API_KEY:
+        raise RuntimeError("Falta GROQ_API_KEY en el .env")
+    text = (transcript_text or "").strip()[:2000] or "(sin transcripción)"
+    url = f"{config.GROQ_BASE}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {config.GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "model": config.CAPTION_MODEL,
+        "messages": [
+            {"role": "system", "content": HOOK_SYSTEM},
+            {"role": "user", "content": (
+                f'Transcripción literal del vídeo:\n"""\n{text}\n"""\n\n'
+                "Escribe UN hook de 3 a 8 palabras fiel a ese contenido. "
+                'Responde SOLO JSON: {"hook": "..."}'
+            )},
+        ],
+        "temperature": 0.75,
+        "max_tokens": 60,
+        "response_format": {"type": "json_object"},
+    }
+    with httpx.Client(timeout=30) as client:
+        resp = client.post(url, headers=headers, json=body)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Groq hook {resp.status_code}: {resp.text[:200]}")
+    data = json.loads(resp.json()["choices"][0]["message"]["content"])
+    hook = (data.get("hook") or "").strip().strip('"').strip("'")
+    # Limpieza: sin punto final, longitud acotada
+    hook = hook.rstrip(".!").strip()
+    return hook[:60]
+
+
 def generate_caption(transcript_text: str, hint: str = "") -> dict:
     if not config.GROQ_API_KEY:
         raise RuntimeError("Falta GROQ_API_KEY en el .env")

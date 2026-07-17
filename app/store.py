@@ -36,6 +36,8 @@ def create_project(name: str) -> dict:
         "audio_path": None,
         "transcript": None,
         "style": dict(config.DEFAULT_STYLE),
+        "titles": [],
+        "sounds": [],
         "caption": None,
         "output": None,
         "steps": {
@@ -58,12 +60,36 @@ def save_project(proj: dict):
         tmp.replace(path)
 
 
+def _migrate(proj: dict) -> dict:
+    """Migración: el gancho antiguo (style.hook_*) pasa a ser un elemento de la
+    lista `titles`, y aparece la lista `sounds`. Ambas son elementos con tiempo
+    que viven en pistas de la línea de tiempo."""
+    if "titles" not in proj:
+        titles = []
+        st = proj.get("style") or {}
+        if st.get("hook_enabled") and (st.get("hook_text") or "").strip():
+            titles.append({
+                "id": "t-hook",
+                "text": st["hook_text"].strip(),
+                "start": 0.0,
+                "end": float(st.get("hook_seconds") or 2.5),
+                "color": st.get("hook_color") or "#FFFFFF",
+                "size": int(st.get("hook_size") or 120),
+                "pos": float(st.get("hook_position") or 24),
+                "sound": st.get("hook_sound") or "",
+            })
+        proj["titles"] = titles
+    if "sounds" not in proj:
+        proj["sounds"] = []
+    return proj
+
+
 def load_project(pid: str) -> dict | None:
     with _lock:
         path = _project_file(pid)
         if not path.exists():
             return None
-        return json.loads(path.read_text(encoding="utf-8"))
+        return _migrate(json.loads(path.read_text(encoding="utf-8")))
 
 
 def update_project(pid: str, **changes) -> dict | None:

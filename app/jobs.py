@@ -33,14 +33,22 @@ def _do_transcribe(pid: str):
     store.set_step(pid, "transcribe", "done")
 
 
+# Progreso de render en memoria (pid -> % 0-100). Lo lee el endpoint sin tocar disco.
+RENDER_PROGRESS: dict = {}
+
+
 def _do_render(pid: str):
     proj = store.load_project(pid)
     if not proj:
         return
     store.set_step(pid, "render", "running")
-    output = render.render_project(proj)
-    store.update_project(pid, output=output, status="rendered")
-    store.set_step(pid, "render", "done")
+    RENDER_PROGRESS[pid] = 0
+    try:
+        output = render.render_project(proj, progress_cb=lambda p: RENDER_PROGRESS.__setitem__(pid, p))
+        store.update_project(pid, output=output, status="rendered")
+        store.set_step(pid, "render", "done")
+    finally:
+        RENDER_PROGRESS.pop(pid, None)
 
 
 def _do_caption(pid: str, hint: str = ""):

@@ -1,64 +1,60 @@
-# 🎬 TikTokAI — Orquestador de edición y subtítulos
+# 🎬 TikTokAI — Editor de subtítulos karaoke con IA
 
-Sistema para subir vídeos verticales (iPhone), generar **subtítulos karaoke estilo TikTok**
-(palabra a palabra) y descargar el vídeo final listo para subir a mano. Nicho: desarrollo
-de apps multiplataforma / IA.
+Sube un vídeo vertical, genera **subtítulos karaoke palabra a palabra** sincronizados con tu voz, retócalos en un editor con timeline estilo CapCut y descarga el vídeo final listo para publicar en TikTok.
 
-> Vive en el mismo VPS que TradingAI pero **totalmente aislado**: directorio propio
-> (`/root/TIKTOKAI`), puerto propio (8080), worker de baja prioridad (`nice`) para no
-> competir por la CPU con el sistema de trading (puerto 8000).
+![TikTokAI editor](docs/screenshot.png)
 
-## Flujo
+## Qué hace
 
-1. **Subir** vídeo vertical (MP4/MOV…).
-2. **Transcribir** con Groq Whisper (timestamps por palabra).
-3. **Editar** palabras (corregir texto, desactivar) y el **estilo** (fuente, tamaño,
-   colores, posición, palabras por bloque, "pop" de la activa…).
-4. **Renderizar**: ffmpeg quema los subtítulos sobre el vídeo (1080 de ancho).
-5. **Copy**: genera descripción + hashtags con Groq.
-6. **Descargar** y subir a TikTok manualmente.
+1. **Subir** un vídeo vertical (MP4/MOV…).
+2. **Transcribir** con Whisper large-v3 (vía Groq): cada palabra con su timestamp exacto.
+3. **Editar**: corrige palabras, ajusta el estilo (fuente, tamaño, colores, posición, palabras por bloque, "pop" de la palabra activa), añade títulos y efectos de sonido en un timeline multipista con imantado y deshacer.
+4. **Copy con IA**: genera título viral y hashtags basados en lo que realmente se dice en el vídeo.
+5. **Renderizar**: ffmpeg + libass queman los subtítulos y títulos sobre el vídeo.
+6. **Descargar** el resultado final.
 
-Cada paso es **orquestable y modificable** desde la interfaz; se puede re-ejecutar.
+Cada paso se puede re-ejecutar de forma independiente desde la interfaz.
 
 ## Arquitectura
 
 ```
 static/ (UI: HTML+CSS+JS, sin build)  ──►  FastAPI (app/main.py)
-                                              ├── jobs.py    cola 1-worker (serializa CPU)
-                                              ├── media.py   ffprobe + extracción audio
+                                              ├── jobs.py        cola de 1 worker (serializa CPU)
+                                              ├── media.py       ffprobe + extracción de audio
                                               ├── transcribe.py  Groq Whisper (word-level)
                                               ├── subtitles.py   genera .ass karaoke + auto-wrap
-                                              ├── render.py      ffmpeg burn (nice/ionice)
-                                              └── captions.py    Groq chat (copy+hashtags)
+                                              ├── render.py      ffmpeg burn-in
+                                              └── captions.py    Groq chat (copy + hashtags)
 data/projects/<id>/   project.json + source.* + audio.mp3 + subs.ass + output.mp4
 ```
 
-## Configuración (`.env`)
+La transcripción y el copy corren en la nube (Groq), así que no necesitas GPU: el único trabajo local es el render con ffmpeg.
 
-- `GROQ_API_KEY` — reutiliza la de TradingAI.
-- `TRANSCRIBE_MODEL` = whisper-large-v3
-- `CAPTION_MODEL` = llama-3.3-70b-versatile
-- `APP_PASSWORD` — contraseña de acceso a la UI.
-- `PORT` = 8080
+## Requisitos
+
+- Python 3.10+
+- **ffmpeg** compilado con **libass** (`ffmpeg -filters | grep ass` para comprobarlo)
+- Una API key gratuita de [Groq](https://console.groq.com/keys)
+
+## Instalación
+
+```bash
+git clone https://github.com/danitechIA/TIKTOKAI.git
+cd TIKTOKAI
+python3 -m venv .venv
+source .venv/bin/activate        # En Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env             # y pon tu GROQ_API_KEY
+```
 
 ## Arrancar
 
 ```bash
-cd /root/TIKTOKAI && ./run.sh
-# o:  .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
+uvicorn app.main:app --host 127.0.0.1 --port 8080
 ```
 
-Acceso: `http://<IP>:8080` (requiere abrir el puerto 8080 en UFW).
+Abre `http://localhost:8080`. Si defines `APP_PASSWORD` en el `.env`, la interfaz pedirá esa contraseña (útil si lo despliegas en un servidor); déjalo vacío para uso local sin login.
 
-## Dependencias del sistema
+## Notas de despliegue
 
-- ffmpeg (con libass) — instalado.
-- Fuentes Montserrat (Black/ExtraBold/Bold) en `fonts/`.
-- Python 3.10 + venv en `.venv/`.
-
-## Notas de recursos (VPS 4 vCPU / 8 GB, sin GPU)
-
-- Transcripción **vía Groq** → no usa CPU local.
-- Render por CPU con `nice -n 15 ionice -c2 -n7`: prioridad por debajo de TradingAI.
-- Cola de **1 trabajo a la vez**: nunca hay dos ffmpeg simultáneos.
-- Los vídeos de origen se pueden borrar tras descargar (limpieza manual desde la UI).
+En producción corre bien en un VPS modesto sin GPU: la cola procesa un render cada vez y ffmpeg puede ejecutarse con prioridad reducida (`nice`/`ionice`) para convivir con otros servicios en la misma máquina.

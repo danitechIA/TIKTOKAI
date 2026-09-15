@@ -1,6 +1,7 @@
 # ===== Secretos — NUNCA subir =====
 .env
 *.env
+.env.*
 !.env.example
 
 # ===== Entorno y datos =====

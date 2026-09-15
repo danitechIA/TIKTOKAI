@@ -65,7 +65,40 @@ def _do_caption(pid: str, hint: str = ""):
     store.set_step(pid, "caption", "done")
 
 
+def _do_proxy(pid: str):
+    """Prepara el material de trabajo del editor: vídeo ligero + tira de miniaturas.
+
+    Es lo que hace que el play y el desplazamiento por la línea de tiempo vayan
+    finos: el navegador deja de tirar del .mov original de 15 Mbps.
+    """
+    proj = store.load_project(pid)
+    if not proj:
+        return
+    src = (proj.get("source") or {}).get("path")
+    if not src:
+        return
+    store.set_step(pid, "proxy", "running")
+    pdir = store.project_dir(pid)
+
+    proxy = pdir / "proxy.mp4"
+    media.make_proxy(src, proxy)
+    store.update_project(pid, proxy_path=str(proxy))
+
+    # Las miniaturas salen del proxy: es mucho más rápido que del original
+    try:
+        dur = float((proj.get("source") or {}).get("duration") or 0)
+        strip = pdir / "strip.jpg"
+        tiles = 40
+        media.make_strip(proxy, strip, dur, tiles)
+        store.update_project(pid, strip_path=str(strip), strip_tiles=tiles)
+    except Exception:
+        traceback.print_exc()   # sin miniaturas se puede editar igual
+
+    store.set_step(pid, "proxy", "done")
+
+
 _HANDLERS = {
+    "proxy": _do_proxy,
     "transcribe": _do_transcribe,
     "render": _do_render,
     "caption": _do_caption,

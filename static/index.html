@@ -2,19 +2,20 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#08080c">
   <title>TikTokAI · Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=15">
+  <link rel="stylesheet" href="/static/styles.css?v=24">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 </head>
 <body>
 
-  <!-- LOGIN -->
+  <!-- ===================== LOGIN ===================== -->
   <div id="login" class="login-wrap hidden">
     <div class="panel login-card">
       <div class="logo-big">🎬</div>
@@ -26,122 +27,102 @@
     </div>
   </div>
 
-  <!-- APP -->
   <div id="app" class="hidden">
-    <div class="topbar">
-      <div class="brand">
-        <div class="logo">🎬</div>
-        <div class="title">TikTok<span class="grad-text">AI</span></div>
-        <span class="tag">studio</span>
+
+    <!-- ===================== HOME: proyectos ===================== -->
+    <div id="home">
+      <div class="home-top">
+        <div class="brand">
+          <div class="logo">🎬</div>
+          <div class="title">TikTok<span class="grad-text">AI</span></div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost btn-sm" id="theme-btn" onclick="toggleTheme()" title="Tema"><i data-lucide="moon" class="ic"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="logout()">Salir</button>
+        </div>
       </div>
-      <div class="topbar-actions">
-        <button class="btn btn-ghost btn-sm" id="theme-btn" onclick="toggleTheme()" title="Tema"><i data-lucide="moon" class="ic"></i></button>
-        <button class="btn btn-ghost btn-sm" onclick="logout()">Salir</button>
+
+      <div class="home-body">
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+          <div class="dz-icon">📲</div>
+          <div class="dz-main">Sube tu vídeo vertical</div>
+          <div class="dz-sub">Toca aquí · MP4, MOV…</div>
+          <div class="progress-bar hidden" id="upload-progress"><div class="fill"></div></div>
+        </div>
+        <input type="file" id="file-input" accept="video/*" class="hidden" onchange="handleUpload(this.files[0])">
+
+        <div class="home-sect">Mis vídeos</div>
+        <div class="proj-list" id="proj-list"></div>
       </div>
     </div>
 
-    <div class="layout">
-      <!-- IZQUIERDA -->
-      <div id="sidebar">
-        <div class="panel">
-          <div class="panel-title"><i data-lucide="upload-cloud" class="ic"></i> Nuevo vídeo</div>
-          <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
-            <div class="dz-icon">📲</div>
-            <div class="dz-main">Sube tu vídeo vertical</div>
-            <div class="dz-sub">Arrastra o haz clic · MP4, MOV…</div>
-            <div class="progress-bar hidden" id="upload-progress"><div class="fill"></div></div>
-          </div>
-          <input type="file" id="file-input" accept="video/*" class="hidden" onchange="handleUpload(this.files[0])">
-          <div class="panel-title" style="margin-top:6px;"><i data-lucide="folder" class="ic"></i> Proyectos</div>
-          <div class="proj-list" id="proj-list"></div>
+    <!-- ===================== EDITOR a pantalla completa ===================== -->
+    <div id="editor" class="hidden">
+
+      <!-- Barra superior: cerrar · estado · exportar -->
+      <header class="ed-top">
+        <button class="ed-icon" onclick="closeEditor()" title="Volver"><i data-lucide="x" class="ic"></i></button>
+        <div class="ed-top-mid">
+          <span class="ed-name" id="ed-name">Proyecto</span>
+          <span class="ed-badge" id="ed-badge">1080P</span>
+        </div>
+        <button class="ed-export" id="btn-render" onclick="doRender()"><i data-lucide="upload" class="ic"></i> <span>Exportar</span></button>
+      </header>
+
+      <!-- Escenario: el vídeo -->
+      <div class="ed-stage">
+        <div class="phone" id="phone">
+          <video id="preview-video" playsinline onclick="togglePlay()"></video>
+          <div class="sub-overlay" id="sub-overlay"></div>
+          <div class="hook-overlay" id="title-overlay"></div>
+        </div>
+        <div id="job-status" class="job-status hidden"></div>
+      </div>
+
+      <!-- Transporte: tiempo · play · deshacer -->
+      <div class="ed-transport">
+        <span class="ed-time" id="tle-time">00:00 / 00:00</span>
+        <div class="ed-transport-mid">
+          <button class="ed-icon" onclick="seekTo(0)" title="Al inicio"><i data-lucide="skip-back" class="ic"></i></button>
+          <button class="ed-play" id="btn-play" onclick="togglePlay()"><i data-lucide="play" class="ic"></i></button>
+          <button class="ed-icon" onclick="doUndo()" title="Deshacer"><i data-lucide="undo-2" class="ic"></i></button>
+        </div>
+        <div class="ed-transport-right">
+          <button class="ed-icon" id="btn-source" onclick="toggleSource()" title="Ver render"><i data-lucide="eye" class="ic"></i></button>
+          <button class="ed-icon" onclick="tlZoom(0.7)" title="Alejar"><i data-lucide="zoom-out" class="ic"></i></button>
+          <button class="ed-icon" onclick="tlZoom(1.45)" title="Acercar"><i data-lucide="zoom-in" class="ic"></i></button>
         </div>
       </div>
 
-      <!-- DERECHA -->
-      <div id="main">
-        <div id="no-project" class="panel">
-          <div class="empty">
-            <div class="big">🎬</div>
-            <div style="font-family:'Space Grotesk';font-weight:700;font-size:19px;margin-bottom:8px;">Sube un vídeo para empezar</div>
-            <div class="hint-text">Subir → transcribir → editar en la línea de tiempo → renderizar → descargar.</div>
-          </div>
+      <!-- LÍNEA DE TIEMPO: el cursor está fijo en el centro y la cinta se mueve -->
+      <div class="ed-timeline" id="timeline-section">
+        <div class="tl-playhead"></div>
+        <div class="tl-scroll" id="tle-scroll">
+          <div class="tl-inner" id="tle-inner"></div>
         </div>
-
-        <div id="editor" class="hidden">
-          <div class="panel">
-            <div class="stepper" id="stepper"></div>
-
-            <div class="editor-top">
-              <!-- PREVIEW -->
-              <div class="pv-col">
-                <div class="phone" id="phone">
-                  <video id="preview-video" playsinline onclick="togglePlay()" style="cursor:pointer;"></video>
-                  <div class="sub-overlay" id="sub-overlay"></div>
-                  <div class="hook-overlay" id="title-overlay"></div>
-                </div>
-                <div class="preview-controls">
-                  <button class="btn btn-ghost btn-sm" onclick="seekTo(0)" title="Ir al inicio"><i data-lucide="skip-back" class="ic"></i></button>
-                  <button class="btn btn-ghost btn-sm" id="btn-play" onclick="togglePlay()"><i data-lucide="play" class="ic"></i> Reproducir</button>
-                  <button class="btn btn-ghost btn-sm hidden" id="btn-source" onclick="toggleSource()">Ver render</button>
-                </div>
-                <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px;">
-                  <button class="btn btn-primary btn-block" id="btn-render" onclick="doRender()"><i data-lucide="sparkles" class="ic"></i> Renderizar</button>
-                  <div id="job-status" class="job-status hidden"></div>
-                  <div id="download-group" class="hidden" style="display:flex;gap:8px;">
-                    <button class="btn btn-accent" style="flex:1" onclick="doDownload()"><i data-lucide="download" class="ic"></i> MP4</button>
-                    <button class="btn btn-accent" style="flex:1" onclick="doDownloadIphone()"><i data-lucide="smartphone" class="ic"></i> iPhone</button>
-                  </div>
-                  <button class="btn btn-danger btn-sm" onclick="doDelete()"><i data-lucide="trash-2" class="ic"></i> Eliminar proyecto</button>
-                </div>
-              </div>
-
-              <!-- INSPECTOR CONTEXTUAL -->
-              <div class="insp" id="inspector"></div>
-            </div>
-
-            <!-- LÍNEA DE TIEMPO MULTI-PISTA -->
-            <div id="timeline-section" class="tle hidden">
-              <div class="tle-head">
-                <span class="tle-lbl-title"><i data-lucide="clapperboard" class="ic"></i> Línea de tiempo</span>
-                <div class="tle-add">
-                  <button class="btn btn-ghost btn-sm" onclick="addTitleAtCursor()"><i data-lucide="type" class="ic"></i> Título</button>
-                  <button class="btn btn-ghost btn-sm" onclick="addSoundAtCursor()"><i data-lucide="volume-2" class="ic"></i> Sonido</button>
-                </div>
-                <div class="tle-zoom">
-                  <span class="tle-time" id="tle-time">00:00 / 00:00</span>
-                  <button class="btn btn-ghost btn-sm" onclick="tlZoom(0.66)" title="Alejar"><i data-lucide="zoom-out" class="ic"></i></button>
-                  <button class="btn btn-ghost btn-sm" onclick="tlZoomFit()" title="Ajustar">Ajustar</button>
-                  <button class="btn btn-ghost btn-sm" onclick="tlZoom(1.5)" title="Acercar"><i data-lucide="zoom-in" class="ic"></i></button>
-                </div>
-              </div>
-              <div class="tle-body">
-                <div class="tle-gutter">
-                  <div class="g"><i data-lucide="captions" class="ic"></i> Subtítulos</div>
-                  <div class="g"><i data-lucide="type" class="ic"></i> Título</div>
-                  <div class="g"><i data-lucide="volume-2" class="ic"></i> Sonido</div>
-                </div>
-                <div class="tle-scroll" id="tle-scroll"><div class="tle-inner" id="tle-inner"></div><div class="tle-tip hidden" id="tle-tip"></div></div>
-              </div>
-              <p class="hint-text" style="margin-top:8px;">Clic en un bloque para editarlo a la derecha · arrastra para moverlo, bordes para recortar · clic en zona vacía para colocar el cursor · <b>espacio</b> reproduce · <b>Ctrl+Z</b> deshace · <b>←/→</b> mueve el cursor.</p>
-            </div>
-
-            <!-- COPY -->
-            <div id="copy-section" class="hidden" style="margin-top:18px;">
-              <div class="section-title"><span class="lbl"><i data-lucide="hash" class="ic"></i> Copy para TikTok</span> <span id="cap-spin"></span></div>
-              <button class="btn btn-ghost btn-sm" onclick="doCaption()" id="btn-caption"><i data-lucide="sparkles" class="ic"></i> Generar descripción + hashtags</button>
-              <div class="caption-box hidden" id="caption-box" style="margin-top:12px;">
-                <div class="cap" id="cap-text"></div>
-                <div class="hashtags" id="cap-tags"></div>
-                <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="copyCaption()"><i data-lucide="copy" class="ic"></i> Copiar todo</button>
-              </div>
-            </div>
-          </div>
+        <div class="tle-tip hidden" id="tle-tip"></div>
+        <div class="tl-empty hidden" id="tl-empty">
+          <i data-lucide="wand-2" class="ic"></i> Transcribe el vídeo para ver aquí los subtítulos
         </div>
       </div>
+
+      <!-- Barra de herramientas -->
+      <nav class="ed-tools" id="ed-tools"></nav>
     </div>
   </div>
 
+  <!-- ===================== HOJA INFERIOR (ajustes) ===================== -->
+  <div class="sheet-bd hidden" id="sheet-bd" onclick="closeSheet()"></div>
+  <section class="sheet hidden" id="sheet" aria-modal="true">
+    <div class="sheet-grab" id="sheet-grab"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="sheet-title">Ajustes</span>
+      <button class="ed-icon" onclick="closeSheet()"><i data-lucide="check" class="ic"></i></button>
+    </div>
+    <div class="sheet-body" id="inspector"></div>
+  </section>
+
   <div class="toast" id="toast"></div>
-  <script src="/static/app.js?v=15" defer></script>
+  <script src="/static/app.js?v=24" defer></script>
 </body>
 </html>

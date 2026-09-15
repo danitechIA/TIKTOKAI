@@ -28,7 +28,7 @@ _load_env()
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 TRANSCRIBE_MODEL = os.environ.get("TRANSCRIBE_MODEL", "whisper-large-v3")
-CAPTION_MODEL = os.environ.get("CAPTION_MODEL", "llama-3.3-70b-versatile")
+CAPTION_MODEL = os.environ.get("CAPTION_MODEL", "openai/gpt-oss-120b")
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8080"))
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")

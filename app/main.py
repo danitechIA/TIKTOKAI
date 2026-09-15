@@ -87,6 +87,8 @@ async def create_project(file: UploadFile = File(...), name: str = Form("")):
 
     source = {"filename": file.filename, "path": str(dest), **info}
     proj = store.update_project(proj["id"], source=source)
+    # Vídeo ligero + miniaturas para que el editor vaya fino desde el primer momento
+    jobs.enqueue("proxy", proj["id"])
     return _public(proj)
 
 
@@ -95,6 +97,7 @@ def get_project(pid: str):
     proj = store.load_project(pid)
     if not proj:
         raise HTTPException(status_code=404, detail="No existe")
+    _ensure_proxy(proj)
     # Añadir el % de render en curso (memoria, sin tocar disco)
     prog = jobs.RENDER_PROGRESS.get(pid)
     if prog is not None:
@@ -247,6 +250,29 @@ def get_source(pid: str):
     return FileResponse(proj["source"]["path"])
 
 
+@app.get("/api/projects/{pid}/preview")
+def get_preview(pid: str):
+    """Vídeo que usa el editor: el proxy ligero si ya está, si no el original."""
+    proj = store.load_project(pid)
+    if not proj or not proj.get("source"):
+        raise HTTPException(status_code=404, detail="Sin vídeo")
+    path = proj.get("proxy_path")
+    if path and Path(path).exists():
+        return FileResponse(path, media_type="video/mp4")
+    _ensure_proxy(proj)
+    return FileResponse(proj["source"]["path"])
+
+
+@app.get("/api/projects/{pid}/strip")
+def get_strip(pid: str):
+    """Tira de miniaturas de la línea de tiempo (una sola imagen)."""
+    proj = store.load_project(pid)
+    path = (proj or {}).get("strip_path")
+    if not path or not Path(path).exists():
+        raise HTTPException(status_code=404, detail="Sin miniaturas")
+    return FileResponse(path, media_type="image/jpeg")
+
+
 @app.get("/api/projects/{pid}/output")
 def get_output(pid: str):
     proj = store.load_project(pid)
@@ -262,6 +288,20 @@ def download(pid: str):
         raise HTTPException(status_code=404, detail="Sin render")
     name = f"{proj['name']}-tiktok.mp4".replace(" ", "_")
     return FileResponse(proj["output"]["path"], filename=name, media_type="video/mp4")
+
+
+def _ensure_proxy(proj: dict):
+    """Encola la preparación del material de trabajo si aún no existe."""
+    path = proj.get("proxy_path")
+    if path and Path(path).exists():
+        return
+    st = (proj.get("steps") or {}).get("proxy") or {}
+    if st.get("status") in ("queued", "running"):
+        return
+    try:
+        jobs.enqueue("proxy", proj["id"])
+    except Exception:
+        pass
 
 
 def _public(proj: dict) -> dict:

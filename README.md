@@ -1,3 +1,12 @@
+<p align="center"><img src=".github/header.svg" alt="TIKTOKAI" width="100%"></p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Whisper-Groq-F55036?style=flat-square&logo=openai&logoColor=white" alt="Whisper">
+  <img src="https://img.shields.io/badge/ffmpeg-libass-007808?style=flat-square&logo=ffmpeg&logoColor=white" alt="ffmpeg">
+</p>
+
 # 🎬 TikTokAI — Editor de subtítulos karaoke con IA
 
 Sube un vídeo vertical, genera **subtítulos karaoke palabra a palabra** sincronizados con tu voz, retócalos en un editor con timeline estilo CapCut y descarga el vídeo final listo para publicar en TikTok.
